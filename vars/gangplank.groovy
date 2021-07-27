@@ -103,6 +103,60 @@ def runSpec(params =[:]) {
         gangplankCmd = _getMode(params)
         gangplankCmd += "--spec ${params['spec']} "
         runGangplank(gangplankCmd)
+    } else {
+        error("runSpec requires a spec param.")
+    }
+}
+
+// Available parameters:
+//     cmd:           string  -- the single command to run
+//     mode:          string  -- Gangplank Mode
+//     extraFlags:    string  -- Extra flags to use
+def runSingleCmd(params = [:]) {
+    if (params['cmd']) {
+        gangplankCmd = _getMode(params)
+        gangplankCmd += " --singleCmd \"${params['cmd']}\""
+        runGangplank(gangplankCmd)
+    } else {
+        error("runSingleCmd requires a cmd param.")
+    }
+}
+
+// A set of default parameters for building our FCOS AARCH64 builds via gangplank.
+// - use a locally build COSA because we don't currently build/push multi-arch COSA anywhere. 
+// - use pod mode with --podman for remote podman execution
+// - use the 'builds' "bucket" will fetch artifacts back into the expected 'builds' directory
+// - target aarch64 architecture
+def getGangPlankFCOSAARCH64Params() {
+    return [mode: 'pod',
+            extraFlags: '--podman --bucket=builds --arch=aarch64',
+            image: 'localhost/coreos-assembler:latest']
+}
+
+// A function to wrap what's needed to run gangplank for our aarch64
+// builder host. Accepts a params map with the usual parameters for
+// a call do runSpec or runSingleCmd.
+def gangPlankFCOSAARCH64BuilderWrapper(params = [:]) {
+    withCredentials([
+        string(credentialsId: 'fcos-aarch64-builder-host-string',
+               variable: 'REMOTEHOST'),
+        string(credentialsId: 'fcos-aarch64-builder-uid-string',
+               variable: 'REMOTEUID'),
+        sshUserPrivateKey(credentialsId: 'fcos-aarch64-builder-sshkey-key',
+                          usernameVariable: 'REMOTEUSER',
+                          keyFileVariable: 'CONTAINER_SSHKEY')
+    ]) {
+        withEnv(["CONTAINER_HOST=ssh://${REMOTEUSER}@${REMOTEHOST}/run/user/${REMOTEUID}/podman/podman.sock"]) {
+            shwrap("""
+            # workaround bug: https://github.com/jenkinsci/configuration-as-code-plugin/issues/1646
+            sed -i s/^----BEGIN/-----BEGIN/ \$CONTAINER_SSHKEY
+            """)
+            if (params['spec']) {
+                runSpec(params)
+            } else {
+                runSingleCmd(params)
+            }
+        }
     }
 }
 
@@ -150,4 +204,3 @@ def _getWorkDir(params = [:], gangplankCmd) {
     }
     return gangplankCmd
 }
-
