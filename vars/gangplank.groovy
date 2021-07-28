@@ -10,7 +10,7 @@
 def buildArtifact(params = [:]) {
     gangplankCmd = _getMode(params)
     gangplankCmd = _getArtifacts(params, gangplankCmd)
-    runGangplank(gangplankCmd)
+    _runGangplank(gangplankCmd)
 }
 
 // Available parameters:
@@ -50,7 +50,7 @@ def generateSpec(params = [:]) {
     gangplankCmd = _getFlags(params, gangplankCmd)
     fileName = "/tmp/jobspec-${UUID.randomUUID()}.spec"
     gangplankCmd += "--yaml-out ${fileName} "
-    runGangplank(gangplankCmd)
+    _runGangplank(gangplankCmd)
     return fileName
 }
 
@@ -59,7 +59,7 @@ def generateSpec(params = [:]) {
 //     gangplankCmd: string  -- Gangplank command to run
 def startParallel(configFile, gangplankCmd) {
     gangplankCmd += "-m ${configFile}"
-    runGangplank(gangplankCmd)
+    _runGangplank(gangplankCmd)
 }
 
 // Available parameters:
@@ -76,14 +76,14 @@ def startMinio(params =[:]) {
 
     // Minio needs to run in background, JENKINS_NODE_COOKIE allows it
     gangplankCmd = "export JENKINS_NODE_COOKIE=dontKillMe && nohup ${gangplankCmd} &"
-    runGangplank(gangplankCmd)
+    _runGangplank(gangplankCmd)
     // Workaround - Wait for minio to start
     shwrap("sleep 0.5")
 
     return configFile
 }
 
-def runGangplank(gangplankCmd) {
+def _runGangplank(gangplankCmd) {
     try {
         shwrap("${gangplankCmd}")
     } catch (Exception e) {
@@ -102,7 +102,7 @@ def runSpec(params =[:]) {
     if (params['spec']) {
         gangplankCmd = _getMode(params)
         gangplankCmd += "--spec ${params['spec']} "
-        runGangplank(gangplankCmd)
+        _runGangplank(gangplankCmd)
     } else {
         error("runSpec requires a spec param.")
     }
@@ -116,52 +116,25 @@ def runSingleCmd(params = [:]) {
     if (params['cmd']) {
         gangplankCmd = _getMode(params)
         gangplankCmd += " --singleCmd \"${params['cmd']}\""
-        runGangplank(gangplankCmd)
+        _runGangplank(gangplankCmd)
     } else {
         error("runSingleCmd requires a cmd param.")
     }
 }
 
-// A set of default parameters for building our FCOS AARCH64 builds via gangplank.
-// - use a locally build COSA because we don't currently build/push multi-arch COSA anywhere. 
-// - use pod mode with --podman for remote podman execution
-// - use the 'builds' "bucket" will fetch artifacts back into the expected 'builds' directory
-// - target aarch64 architecture
-def getGangPlankFCOSAARCH64Params() {
-    return [mode: 'pod',
-            extraFlags: '--podman --bucket=builds --arch=aarch64',
-            image: 'localhost/coreos-assembler:latest']
-}
-
-// A function to wrap what's needed to run gangplank for our aarch64
+// A function to wrap runSpec and runSingleCmd based on params
 // builder host. Accepts a params map with the usual parameters for
-// a call do runSpec or runSingleCmd.
-def gangPlankFCOSAARCH64BuilderWrapper(params = [:]) {
-    withCredentials([
-        string(credentialsId: 'fcos-aarch64-builder-host-string',
-               variable: 'REMOTEHOST'),
-        string(credentialsId: 'fcos-aarch64-builder-uid-string',
-               variable: 'REMOTEUID'),
-        sshUserPrivateKey(credentialsId: 'fcos-aarch64-builder-sshkey-key',
-                          usernameVariable: 'REMOTEUSER',
-                          keyFileVariable: 'CONTAINER_SSHKEY')
-    ]) {
-        withEnv(["CONTAINER_HOST=ssh://${REMOTEUSER}@${REMOTEHOST}/run/user/${REMOTEUID}/podman/podman.sock"]) {
-            shwrap("""
-            # workaround bug: https://github.com/jenkinsci/configuration-as-code-plugin/issues/1646
-            sed -i s/^----BEGIN/-----BEGIN/ \$CONTAINER_SSHKEY
-            """)
-            if (params['spec']) {
-                runSpec(params)
-            } else {
-                runSingleCmd(params)
-            }
-        }
+// a call to runSpec or runSingleCmd.
+def runGangplank(params = [:]) {
+    if (params['spec']) {
+        runSpec(params)
+    } else {
+        runSingleCmd(params)
     }
 }
 
 def _finalize() {
-    runGangplank("gangplank pod -A finalize")
+    _runGangplank("gangplank pod -A finalize")
 }
 
 def _getArtifacts(params =[:], gangplankCmd) {
@@ -189,10 +162,19 @@ def _getImage(params = [:], gangplankCmd) {
     return gangplankCmd
 }
 
+def _getArch(params = [:], gangplankCmd) {
+    if (params['arch']) {
+        gangplankCmd += "--arch ${params['arch']} "
+        return gangplankCmd
+    }
+    return gangplankCmd
+}
+
 def _getMode(params = [:]) {
     gangplankCmd = "gangplank " + params.get('mode', "pod") + " "
     gangplankCmd = _getFlags(params, gangplankCmd)
     gangplankCmd = _getImage(params, gangplankCmd)
+    gangplankCmd = _getArch(params, gangplankCmd)
     gangplankCmd = _getWorkDir(params, gangplankCmd)
     return gangplankCmd
 }
