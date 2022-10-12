@@ -34,59 +34,52 @@ def call(params = [:]) {
     // Create a unique output directory for this run of fcosKola
     def outputDir = shwrapCapture("mktemp -d ${cosaDir}/tmp/kolaTestIso-XXXXX")
 
+    // list of identifiers for each run for log collection
+    def Ids = []
+
     testIsoRuns1 = [:]
     testIsoRuns2 = [:]
     testIsoRuns1["metal"] = {
-        def scenariosArg
         def id = marker == "" ? "kola-testiso-metal" : "kola-testiso-metal-${marker}"
-        try {
-            scenariosArg = scenarios == "" ? "" : "--scenarios ${scenarios}"
-            shwrap("cd ${cosaDir} && kola testiso -S ${extraArgs} ${scenariosArg} --output-dir ${outputDir}/${id}")
-        } finally {
-            shwrap("tar -c -C ${outputDir} ${id} | xz -c9 > ${env.WORKSPACE}/${id}-${token}.tar.xz")
-            archiveArtifacts allowEmptyArchive: true, artifacts: "${id}-${token}.tar.xz"
-        }
+        Ids += id
+        def scenariosArg = scenarios == "" ? "" : "--scenarios ${scenarios}"
+        shwrap("cd ${cosaDir} && kola testiso -S ${extraArgs} ${scenariosArg} --output-dir ${outputDir}/${id}")
     }
     if (!params['skipMetal4k']) {
         testIsoRuns1["metal4k"] = {
-            def scenariosArg
             def id = marker == "" ? "kola-testiso-metal4k" : "kola-testiso-metal4k-${marker}"
-            try {
-                scenariosArg = scenarios4k == "" ? "" : "--scenarios ${scenarios}"
-                shwrap("cd ${cosaDir} && kola testiso -S --qemu-native-4k ${extraArgs4k} ${scenariosArg} --output-dir ${outputDir}/${id}")
-            } finally {
-                shwrap("tar -c -C ${outputDir} ${id} | xz -c9 > ${env.WORKSPACE}/${id}-${token}.tar.xz")
-                archiveArtifacts allowEmptyArchive: true, artifacts: "${id}-${token}.tar.xz"
-            }
+            Ids += id
+            def scenariosArg = scenarios4k == "" ? "" : "--scenarios ${scenarios}"
+            scenariosArg = scenarios4k == "" ? "" : "--scenarios ${scenarios}"
+            shwrap("cd ${cosaDir} && kola testiso -S --qemu-native-4k ${extraArgs4k} ${scenariosArg} --output-dir ${outputDir}/${id}")
         }
     }
     if (!params['skipMultipath']) {
         testIsoRuns2["multipath"] = {
             def id = marker == "" ? "kola-testiso-multipath" : "kola-testiso-multipath-${marker}"
-            try {
-                shwrap("cd ${cosaDir} && kola testiso -S --qemu-multipath ${extraArgsMultipath} --scenarios ${scenariosMultipath} --output-dir ${outputDir}/${id}")
-            } finally {
-                shwrap("tar -c -C ${outputDir} ${id} | xz -c9 > ${env.WORKSPACE}/${id}-${token}.tar.xz")
-                archiveArtifacts allowEmptyArchive: true, artifacts: "${id}-${token}.tar.xz"
-            }
+            Ids += id
+            shwrap("cd ${cosaDir} && kola testiso -S --qemu-multipath ${extraArgsMultipath} --scenarios ${scenariosMultipath} --output-dir ${outputDir}/${id}")
         }
     }
     if (!params['skipUEFI']) {
         testIsoRuns2["metalUEFI"] = {
             def id = marker == "" ? "kola-testiso-uefi" : "kola-testiso-uefi-${marker}"
-            try {
-                shwrap("mkdir -p tmp/${id}")
-                shwrap("cd ${cosaDir} && kola testiso -S --qemu-firmware=uefi ${extraArgsUEFI} --scenarios ${scenariosUEFI} --output-dir tmp/${id}/insecure")
-                shwrap("cd ${cosaDir} && kola testiso -S --qemu-firmware=uefi-secure ${extraArgsUEFI} --scenarios ${scenariosUEFI} --output-dir tmp/${id}/secure")
-            } finally {
-                shwrap("tar -c -C ${outputDir} ${id} | xz -c9 > ${env.WORKSPACE}/${id}-${token}.tar.xz")
-                archiveArtifacts allowEmptyArchive: true, artifacts: "${id}-${token}.tar.xz"
-            }
+            Ids += id
+            shwrap("mkdir -p tmp/${id}")
+            shwrap("cd ${cosaDir} && kola testiso -S --qemu-firmware=uefi ${extraArgsUEFI} --scenarios ${scenariosUEFI} --output-dir tmp/${id}/insecure")
+            shwrap("cd ${cosaDir} && kola testiso -S --qemu-firmware=uefi-secure ${extraArgsUEFI} --scenarios ${scenariosUEFI} --output-dir tmp/${id}/secure")
         }
     }
 
     stage("Test Live Images") {
-        parallel(testIsoRuns1)
-        parallel(testIsoRuns2)
+        try {
+            parallel(testIsoRuns1)
+            parallel(testIsoRuns2)
+        } finally {
+            for (id in Ids) {
+                shwrap("tar -c -C ${outputDir} ${id} | xz -c9 > ${env.WORKSPACE}/${id}-${token}.tar.xz")
+                archiveArtifacts allowEmptyArchive: true, artifacts: "${id}-${token}.tar.xz"
+            }
+        }
     }
 }
