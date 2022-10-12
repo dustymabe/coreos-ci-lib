@@ -28,25 +28,21 @@ def call(params = [:]) {
     testIsoRuns1 = [:]
     testIsoRuns2 = [:]
     testIsoRuns1["metal"] = {
+        def scenariosArg
         try {
-            if (params['scenarios']) {
-                shwrap("cd ${cosaDir}  && kola testiso -S ${extraArgs} --scenarios ${scenarios} --output-dir tmp/kola-testiso-metal")
-            } else {
-                shwrap("cd ${cosaDir}  && kola testiso -S ${extraArgs} --output-dir tmp/kola-testiso-metal")
-            }
+            scenariosArg = scenarios == "" ? "" : "--scenarios ${scenarios}"
+            shwrap("cd ${cosaDir} && kola testiso -S ${extraArgs} ${scenariosArg} --output-dir tmp/kola-testiso-metal")
         } finally {
             shwrap("cd ${cosaDir} && tar -cf - tmp/kola-testiso-metal/ | xz -c9 > ${env.WORKSPACE}/kola-testiso-metal.tar.xz")
             archiveArtifacts allowEmptyArchive: true, artifacts: 'kola-testiso-metal.tar.xz'
         }
     }
     if (!params['skipMetal4k']) {
+        def scenariosArg
         testIsoRuns1["metal4k"] = {
             try {
-                if (params['scenarios4k']) {
-                    shwrap("cd ${cosaDir} &&  kola testiso -S --qemu-native-4k ${extraArgs4k} --scenarios ${scenarios4k} --output-dir tmp/kola-testiso-metal4k")
-                } else {
-                    shwrap("cd ${cosaDir} &&  kola testiso -S --qemu-native-4k ${extraArgs4k} --output-dir tmp/kola-testiso-metal4k")
-                }
+                scenariosArg = scenarios4k == "" ? "" : "--scenarios ${scenarios}"
+                shwrap("cd ${cosaDir} && kola testiso -S --qemu-native-4k ${extraArgs4k} ${scenariosArg} --output-dir tmp/kola-testiso-metal4k")
             } finally {
                 shwrap("cd ${cosaDir} && tar -cf - tmp/kola-testiso-metal4k/ | xz -c9 > ${env.WORKSPACE}/kola-testiso-metal4k.tar.xz")
                 archiveArtifacts allowEmptyArchive: true, artifacts: 'kola-testiso-metal4k.tar.xz'
