@@ -68,7 +68,7 @@ def call(params = [:]) {
             if (!params['skipBasicScenarios']) {
                 shwrap("cd ${cosaDir} && cosa kola run ${rerun} --output-dir=${outputDir}/kola --basic-qemu-scenarios")
             }
-            shwrap("cd ${cosaDir} && cosa kola run ${rerun} --output-dir=${outputDir}/kola --build=${buildID} ${arch} ${platformArgs} --tag '!reprovision' --parallel ${parallel} ${args} ${extraArgs}")
+            shwrap("cd ${cosaDir} && cosa kola run ${rerun} --output-dir=${outputDir}/kola --denylist-test basic --build=${buildID} ${arch} ${platformArgs} --tag '!reprovision' --parallel ${parallel} ${args} ${extraArgs}")
         } finally {
             shwrap("tar -c -C ${outputDir} kola | xz -c9 > ${env.WORKSPACE}/${marker}-${token}.tar.xz")
             archiveArtifacts allowEmptyArchive: true, artifacts: "${marker}-${token}.tar.xz"
