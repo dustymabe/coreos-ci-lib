@@ -125,22 +125,21 @@ def call(params = [:]) {
         }
     }
 
-    stage('Kola') {
-        dir(cosaDir) {
-            try {
-                if (kolaRuns.size() == 1) {
-                    kolaRuns.each { k, v -> v() }
-                } else {
-                    parallel(kolaRuns)
-                }
-            } finally {
-                for (id in Ids) {
-                    // sanity check kola actually ran and dumped its output
-                    shwrap("cosa shell -- test -d ${outputDir}/${id}")
-                    // collect the output
-                    shwrap("cosa shell -- tar -c --xz ${outputDir}/${id} > ${env.WORKSPACE}/${id}-${token}.tar.xz")
-                    archiveArtifacts allowEmptyArchive: true, artifacts: "${id}-${token}.tar.xz"
-                }
+    // Run the Kola tests from the cosaDir
+    dir(cosaDir) {
+        try {
+            if (kolaRuns.size() == 1) {
+                kolaRuns.each { k, v -> v() }
+            } else {
+                parallel(kolaRuns)
+            }
+        } finally {
+            for (id in Ids) {
+                // sanity check kola actually ran and dumped its output
+                shwrap("cosa shell -- test -d ${outputDir}/${id}")
+                // collect the output
+                shwrap("cosa shell -- tar -c --xz ${outputDir}/${id} > ${env.WORKSPACE}/${id}-${token}.tar.xz")
+                archiveArtifacts allowEmptyArchive: true, artifacts: "${id}-${token}.tar.xz"
             }
         }
     }
