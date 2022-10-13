@@ -74,21 +74,33 @@ def call(params = [:]) {
             args += " --exttest ${env.WORKSPACE}/${path}"
         }
 
-        // basic run
-        if (!params['skipBasicScenarios']) {
-            id = marker == "" ? "kola-basic" : "kola-basic-${marker}"
-            Ids += id
-            shwrap("cosa kola run ${rerun} --output-dir=${outputDir}/${id} --basic-qemu-scenarios")
-        }
-        // normal run (without reprovision tests because those require a lot of memory)
-        id = marker == "" ? "kola" : "kola-${marker}"
-        Ids += id
-        shwrap("cosa kola run ${rerun} --output-dir=${outputDir}/${id} --denylist-test basic --build=${buildID} ${archArg} ${platformArgs} --tag '!reprovision' --parallel ${parallel} ${args} ${extraArgs}")
+        def isQEMU = platformArgs == "" ? true : false
 
-        // re-provision tests (not run with --parallel argument to kola)
-        id = marker == "" ? "kola-reprovision" : "kola-reprovision-${marker}"
-        Ids += id
-        shwrap("cosa kola run ${rerun} --output-dir=${outputDir}/${id} --build=${buildID} ${archArg} ${platformArgs} --tag reprovision ${args} ${extraArgs}")
+        if (!isQEMU) {
+            // For cloud (non qemu) tests we don't need to worry about
+            // basic-qemu-scenarios and we don't need to worry about
+            // resources usage so we don't need to run reprovision
+            // tests separately. Run them all up front.
+            id = marker == "" ? "kola" : "kola-${marker}"
+            Ids += id
+            shwrap("cosa kola run ${rerun} --output-dir=${outputDir}/${id} --build=${buildID} ${archArg} ${platformArgs} --parallel ${parallel} ${args} ${extraArgs}")
+        } else {
+            // basic run
+            if (!params['skipBasicScenarios']) {
+                id = marker == "" ? "kola-basic" : "kola-basic-${marker}"
+                Ids += id
+                shwrap("cosa kola run ${rerun} --output-dir=${outputDir}/${id} --basic-qemu-scenarios")
+            }
+            // normal run (without reprovision tests because those require a lot of memory)
+            id = marker == "" ? "kola" : "kola-${marker}"
+            Ids += id
+            shwrap("cosa kola run ${rerun} --output-dir=${outputDir}/${id} --denylist-test basic --build=${buildID} ${archArg} ${platformArgs} --tag '!reprovision' --parallel ${parallel} ${args} ${extraArgs}")
+
+            // re-provision tests (not run with --parallel argument to kola)
+            id = marker == "" ? "kola-reprovision" : "kola-reprovision-${marker}"
+            Ids += id
+            shwrap("cosa kola run ${rerun} --output-dir=${outputDir}/${id} --build=${buildID} ${archArg} ${platformArgs} --tag reprovision ${args} ${extraArgs}")
+        }
     }
 
     if (!params["skipUpgrade"]) {
