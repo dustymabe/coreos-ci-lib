@@ -1,6 +1,7 @@
 // Run kola tests on the latest build in the cosa dir
 // Available parameters:
 //    addExtTests:       []string -- list of test paths to run
+//    allowUpgradeFail   boolean  -- warn instead of fail on upgrade failure
 //    arch:              string   -- the target architecture
 //    cosaDir:           string   -- cosa working directory
 //    parallel:          integer  -- number of tests to run in parallel (default: # CPUs)
@@ -105,9 +106,22 @@ def call(params = [:]) {
 
     if (!params["skipUpgrade"]) {
         kolaRuns['run_upgrades'] = {
-            def id = marker == "" ? "kola-upgrade" : "kola-upgrade-${marker}"
-            Ids += id
-            shwrap("cosa kola ${rerun} --output-dir=${outputDir}/${id} --upgrades --build=${buildID} ${archArg} ${platformArgs}")
+            // If upgrades are broken `cosa kola --upgrades` might
+            // fail to even find the previous image so we wrap this
+            // in a try/catch so ALLOW_KOLA_UPGRADE_FAILURE can work.
+            try {
+                def id = marker == "" ? "kola-upgrade" : "kola-upgrade-${marker}"
+                Ids += id
+                shwrap("cosa kola ${rerun} --output-dir=${outputDir}/${id} --upgrades --build=${buildID} ${archArg} ${platformArgs}")
+            } catch(e) {
+                if (params["allowUpgradeFail"]) {
+                    warnError(message: 'Upgrade Failed') {
+                        error(e.getMessage())
+                    }
+                } else {
+                    throw e
+                }
+            }
         }
     }
 
