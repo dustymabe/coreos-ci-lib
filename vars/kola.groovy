@@ -132,7 +132,9 @@ def call(params = [:]) {
     }
 
     try {
-        parallel(kolaRuns)
+        stage('Kola') {
+            parallel(kolaRuns)
+        }
     } finally {
         for (id in ids) {
             // sanity check kola actually ran and dumped its output

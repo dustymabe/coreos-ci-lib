@@ -87,9 +87,11 @@ def call(params = [:]) {
     }
 
     try {
-        // Run at most two testiso runs at a time to try not to
-        // exceed 8G of memory usage.
-        utils.runParallel(testIsoRuns, 2)
+        stage('Kola:TestISO') {
+            // Run at most two testiso runs at a time to try not to
+            // exceed 8G of memory usage.
+            utils.runParallel(testIsoRuns, 2)
+        }
     } finally {
         for (id in ids) {
             shwrap("cd ${cosaDir} && cosa shell -- tar -c --xz ${outputDir}/${id} > ${env.WORKSPACE}/${id}-${token}.tar.xz || :")
