@@ -68,40 +68,6 @@ def call(params = [:]) {
     // conditionally only add the `run_upgrades` stage if not explicitly
     // skipped.
     def kolaRuns = [:]
-    kolaRuns["${titleMarker}kola"] = {
-        def args = ""
-        def id
-        // Add the tests/kola directory, but only if it's not the same as the
-        // src/config repo which is also automatically added.
-        if (shwrapRc("""
-            test -d ${env.WORKSPACE}/tests/kola
-            configorigin=\$(cd ${cosaDir}/src/config && git config --get remote.origin.url)
-            gitorigin=\$(cd ${env.WORKSPACE} && git config --get remote.origin.url)
-            test "\$configorigin" != "\$gitorigin"
-        """) == 0)
-        {
-            // The workspace name created by Jenkins is messy and dynamic, but
-            // kola uses it to derive the test name. Let's fix it by using a
-            // symlinked dir (x86_64) or copied dir (multi-arch).
-            def name = shwrapCapture("basename \$(git config --get remote.origin.url) .git")
-            if (arch == 'x86_64') {
-                shwrap("mkdir -p /var/tmp/kola && ln -s ${env.WORKSPACE} /var/tmp/kola/${name}")
-            } else {
-                shwrap("""
-                cd ${cosaDir} && cosa shell -- mkdir -p /var/tmp/kola
-                cd ${cosaDir} && cosa remote-session sync ${env.WORKSPACE}/ :/var/tmp/kola/${name}/
-                """)
-            }
-            args += "--exttest /var/tmp/kola/${name}"
-        }
-        def parallel = params.get('parallel', "auto");
-        def extraArgs = params.get('extraArgs', "");
-        def addExtTests = params.get('addExtTests', [])
-
-        for (path in addExtTests) {
-            args += " --exttest=${env.WORKSPACE}/${path}"
-        }
-
     if (!params["skipUpgrade"]) {
         kolaRuns["${titleMarker}kola:upgrade"] = {
             // If upgrades are broken `cosa kola --upgrades` might
