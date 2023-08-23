@@ -53,7 +53,7 @@ def call(params = [:]) {
     def runKola = { id, args ->
         def rc = shwrapRc("""
             cd ${cosaDir}
-            cosa kola run ${rerun} --build=${buildID} --output-dir=${outputDir}/${id} \
+            cosa kola ${rerun} --build=${buildID} --output-dir=${outputDir}/${id} \
                 --on-warn-failure-exit-77 ${archArg} ${platformArgs} ${args}
         """)
         if (rc == 77) {
